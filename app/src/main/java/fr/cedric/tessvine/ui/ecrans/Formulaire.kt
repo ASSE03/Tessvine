@@ -353,12 +353,34 @@ fun EcranAjout(nav: Nav, codeInitial: String) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }
             brouillon?.let { id ->
-                AsyncImage(
-                    model = Session.api.url("brouillons/$id/image?fond=$fond"),
+                // Le détourage se fait sur le serveur (jusqu'à une minute la première fois) : on le prépare d'abord,
+                // puis on affiche l'image déjà composée.
+                var affiche by remember(id) { mutableStateOf<String?>(null) }
+                var preparation by remember(id) { mutableStateOf(false) }
+                LaunchedEffect(id, fond, capacites.cadrage_defaut) {
+                    if (fond.isBlank()) { affiche = ""; return@LaunchedEffect }
+                    preparation = true
+                    try {
+                        Session.api.brut("POST", "brouillons/$id/rendu", obj("fond" to fond, "cadrage" to capacites.cadrage_defaut))
+                        affiche = fond
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        affiche = ""
+                        snackbar.showSnackbar("Détourage impossible : ${e.message}. Photo d'origine conservée.", withDismissAction = true)
+                    } finally { preparation = false }
+                }
+                val choisi = affiche
+                if (choisi != null) AsyncImage(
+                    model = Session.api.url("brouillons/$id/image?fond=$choisi&cadrage=${capacites.cadrage_defaut}"),
                     contentDescription = "Photo de la bouteille",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).clip(RoundedCornerShape(16.dp)),
                 )
+                if (preparation) {
+                    Text("Détourage de la bouteille… (jusqu'à une minute la première fois)", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
                 if (capacites.detourage && capacites.fonds.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(fond == "", { fond = "" }, { Text("Photo d'origine") })
                     capacites.fonds.forEach { x -> FilterChip(fond == x.id, { fond = x.id }, { Text(x.label) }) }
