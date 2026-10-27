@@ -50,16 +50,15 @@ fun EcranConnexion(nav: Nav, premierLancement: Boolean) {
         resultat = null
         val api = Session.api
         val lignes = mutableListOf<String>()
-        var unOk = false
         for ((nom, url) in listOf("Maison" to maison, "Extérieur" to exterieur)) {
             if (url.isBlank()) continue
             val e = api.tester(url, cle)
-            if (e == null) unOk = true
             lignes += "$nom : ${e ?: "✓ Tessvine répond"}"
         }
         resultat = if (lignes.isEmpty()) "Indiquez au moins une adresse" else lignes.joinToString("\n")
         test = false
-        if (unOk && apresSucces) {
+        // « Enregistrer » sauvegarde même si rien ne répond (téléphone hors de la maison, serveur éteint…)
+        if (apresSucces && lignes.isNotEmpty()) {
             prefs.urlMaison = maison
             prefs.urlExterieur = exterieur
             prefs.cle = cle
