@@ -134,7 +134,7 @@ class Api(private val prefs: Preferences) {
             })
             .build()
         try {
-            client.newCall(req).execute().use { r ->
+            executer(client.newCall(req)).use { r ->
                 val texte = r.body?.string() ?: ""
                 if (!r.isSuccessful) {
                     val message = runCatching {
@@ -149,6 +149,20 @@ class Api(private val prefs: Preferences) {
             throw ErreurApi("Connexion perdue avec Tessvine (${e.message ?: "réseau"})")
         }
     }
+
+    /** Exécute un appel HTTP qu'on peut annuler (délai dépassé, bouton « Annuler », écran quitté). */
+    private suspend fun executer(appel: okhttp3.Call): okhttp3.Response =
+        kotlinx.coroutines.suspendCancellableCoroutine { suite ->
+            suite.invokeOnCancellation { appel.cancel() }
+            appel.enqueue(object : okhttp3.Callback {
+                override fun onFailure(call: okhttp3.Call, e: IOException) {
+                    if (suite.isActive) suite.resumeWith(Result.failure(e))
+                }
+                override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                    if (suite.isActive) suite.resumeWith(Result.success(response)) else response.close()
+                }
+            })
+        }
 
     suspend inline fun <reified T> get(chemin: String): T = json.decodeFromString(brut("GET", chemin))
     suspend inline fun <reified T> post(chemin: String, corps: JsonElement? = null): T = json.decodeFromString(brut("POST", chemin, corps))

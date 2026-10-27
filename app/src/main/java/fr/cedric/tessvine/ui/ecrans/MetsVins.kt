@@ -64,6 +64,7 @@ import fr.cedric.tessvine.ui.composants.charger
 import fr.cedric.tessvine.ui.theme.Or
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 @Composable
 fun EcranMetsVins(nav: Nav) {
@@ -74,6 +75,7 @@ fun EcranMetsVins(nav: Nav) {
     var conseil by remember { mutableStateOf<ConseilPlat?>(null) }
     var reflexion by remember { mutableStateOf(false) }
     var sortir by remember { mutableStateOf<Vin?>(null) }
+    var travail by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val scope = rememberCoroutineScope()
     val snackbar = LocalSnackbar.current
     val focus = LocalFocusManager.current
@@ -83,13 +85,20 @@ fun EcranMetsVins(nav: Nav) {
         val q = texte.trim()
         if (q.isEmpty()) { conseil = null; tuiles.recharger(); return }
         focus.clearFocus()
-        scope.launch {
+        travail?.cancel()
+        travail = scope.launch {
             reflexion = true
             try {
-                val r = Session.api.conseil(q, couleur)
+                // l'IA peut être saturée : on n'attend pas plus d'une minute
+                val r = withTimeoutOrNull(60_000) { Session.api.conseil(q, couleur) }
+                    ?: throw fr.cedric.tessvine.data.ErreurApi(
+                        "L'IA ne répond pas (plus d'une minute). Réessayez plus tard, ou choisissez une catégorie ci-dessous."
+                    )
                 conseil = r
                 plat = if (r.source == "regles") r.plat ?: "" else ""
-            } catch (e: CancellationException) { throw e } catch (e: Exception) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 snackbar.showSnackbar(
                     if ((e as? fr.cedric.tessvine.data.ErreurApi)?.code == 404)
                         "La recherche libre demande le patch « recherche de plat » sur Tessvine"
@@ -118,7 +127,10 @@ fun EcranMetsVins(nav: Nav) {
             Icon(Icons.Filled.WineBar, null); Spacer(Modifier.width(8.dp)); Text("Conseiller")
         }
         if (reflexion) {
-            Text("Le sommelier réfléchit à « ${texte.trim()} »…", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Le sommelier réfléchit à « ${texte.trim()} »…", Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = { travail?.cancel(); reflexion = false }) { Text("Annuler") }
+            }
             LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
         }
         conseil?.let { c ->

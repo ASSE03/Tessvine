@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -102,7 +103,7 @@ fun App() {
                                     }
                                 },
                                 icon = { Icon(o.icone, null) },
-                                label = { Text(o.libelle, maxLines = 1) },
+                                label = { Text(o.libelle, maxLines = 1, softWrap = false, fontSize = 11.sp) },
                             )
                         }
                     }
