@@ -75,6 +75,9 @@ import kotlinx.coroutines.launch
 
 val LocalSnackbar = compositionLocalOf { SnackbarHostState() }
 
+/** Ouvre l'écran de connexion au serveur (bouton des messages « Tessvine injoignable »). */
+val LocalOuvrirConnexion = compositionLocalOf<() -> Unit> { {} }
+
 /** Portée de coroutines de l'application entière : survit à la fermeture d'un dialogue (pour « Annuler »). */
 val LocalPortee = compositionLocalOf<CoroutineScope> { error("Portée non fournie") }
 
@@ -133,6 +136,11 @@ fun MessageErreur(message: String, reessayer: (() -> Unit)? = null) {
                 Spacer(Modifier.width(8.dp))
                 Text("Réessayer")
             }
+        }
+        if (message.contains("injoignable", ignoreCase = true) || message.contains("Clé d'API")) {
+            val ouvrir = LocalOuvrirConnexion.current
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = ouvrir) { Text("Réglages de connexion") }
         }
     }
 }

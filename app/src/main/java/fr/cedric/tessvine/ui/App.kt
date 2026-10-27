@@ -31,6 +31,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import fr.cedric.tessvine.data.Session
+import fr.cedric.tessvine.ui.composants.LocalOuvrirConnexion
 import fr.cedric.tessvine.ui.composants.LocalPortee
 import fr.cedric.tessvine.ui.composants.LocalSnackbar
 import fr.cedric.tessvine.ui.ecrans.EcranAccueil
@@ -81,7 +82,10 @@ fun App() {
 
     LaunchedEffect(Unit) { Session.chargerReferentiel() }
 
-    CompositionLocalProvider(LocalSnackbar provides snackbar, LocalPortee provides portee) {
+    CompositionLocalProvider(
+        LocalSnackbar provides snackbar, LocalPortee provides portee,
+        LocalOuvrirConnexion provides { nav.ecran("serveur") },
+    ) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {

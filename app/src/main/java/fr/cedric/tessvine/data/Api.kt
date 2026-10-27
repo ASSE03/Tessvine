@@ -103,7 +103,16 @@ class Api(private val prefs: Preferences) {
             if (e == "Clé d'API refusée") throw ErreurApi("Clé d'API refusée par Tessvine : vérifiez-la dans les réglages", 401)
             erreurs += "$u : $e"
         }
-        throw ErreurApi("Tessvine injoignable.\n" + erreurs.joinToString("\n"))
+        val conseils = buildList {
+            if (essais.any { it.contains("nabu.casa") })
+                add("• L'adresse Nabu Casa ne fonctionne pas avec l'appli : retirez-la du champ « extérieur ».")
+            if (essais.any { Regex("""//(192\.168|10\.|172\.(1[6-9]|2\d|3[01]))""").containsMatchIn(it) })
+                add("• L'adresse maison ne marche que sur votre Wi-Fi : connectez-vous au Wi-Fi, ou utilisez un VPN (Tailscale) hors de chez vous.")
+        }
+        throw ErreurApi(
+            "Tessvine injoignable.\n\n" + (if (conseils.isEmpty()) "" else conseils.joinToString("\n") + "\n\n") +
+                "Détail :\n" + erreurs.joinToString("\n")
+        )
     }
 
     /** Adresse complète d'une ressource (images), avec la clé en paramètre. */
