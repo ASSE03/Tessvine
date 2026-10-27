@@ -31,7 +31,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import fr.cedric.tessvine.data.Maj
 import fr.cedric.tessvine.data.Session
+import fr.cedric.tessvine.ui.composants.DialogueMiseAJour
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import fr.cedric.tessvine.ui.composants.LocalOuvrirConnexion
 import fr.cedric.tessvine.ui.composants.LocalPortee
 import fr.cedric.tessvine.ui.composants.LocalSnackbar
@@ -81,12 +85,20 @@ fun App() {
     val entree by controleur.currentBackStackEntryAsState()
     val routeActuelle = entree?.destination?.route?.substringBefore('?')
 
-    LaunchedEffect(Unit) { Session.chargerReferentiel() }
+    var nouvelle by remember { mutableStateOf<Maj.Version?>(null) }
+    LaunchedEffect(Unit) {
+        Session.chargerReferentiel()
+        // mise à jour de l'appli : vérification discrète au démarrage
+        if (Session.prefs.majAuto && Session.prefs.jetonGithub.isNotBlank()) {
+            nouvelle = runCatching { Maj.verifier(Session.prefs.jetonGithub) }.getOrNull()
+        }
+    }
 
     CompositionLocalProvider(
         LocalSnackbar provides snackbar, LocalPortee provides portee,
         LocalOuvrirConnexion provides { nav.ecran("serveur") },
     ) {
+        nouvelle?.let { v -> DialogueMiseAJour(v) { nouvelle = null } }
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {

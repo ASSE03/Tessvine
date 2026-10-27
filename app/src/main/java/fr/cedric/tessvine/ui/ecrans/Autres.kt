@@ -313,6 +313,7 @@ fun EcranReglages(nav: Nav) {
                     }
                 }
             }
+            CarteMiseAJour()
             Carte(onClick = { nav.ecran("serveur") }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Wifi, null, tint = Or)
@@ -329,4 +330,48 @@ fun EcranReglages(nav: Nav) {
             )
         }
     }
+}
+
+
+// ---------------------------------------------------------------------- mises à jour de l'appli
+
+@Composable
+private fun CarteMiseAJour() {
+    val snackbar = LocalSnackbar.current
+    val scope = rememberCoroutineScope()
+    var jeton by remember { mutableStateOf(Session.prefs.jetonGithub) }
+    var auto by remember { mutableStateOf(Session.prefs.majAuto) }
+    var verification by remember { mutableStateOf(false) }
+    var nouvelle by remember { mutableStateOf<fr.cedric.tessvine.data.Maj.Version?>(null) }
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+
+    Carte {
+        Text("Mises à jour de l'appli", style = MaterialTheme.typography.titleMedium)
+        Text("Version installée : ${fr.cedric.tessvine.data.Maj.nomVersion}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(
+            jeton, { jeton = it }, label = { Text("Jeton GitHub (lecture seule)") }, singleLine = true,
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        TextButton(onClick = {
+            uri.openUri("https://github.com/settings/personal-access-tokens/new")
+        }) { Text("Créer un jeton sur GitHub ›") }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Vérifier à chaque démarrage", Modifier.weight(1f))
+            androidx.compose.material3.Switch(auto, { auto = it; Session.prefs.majAuto = it })
+        }
+        Spacer(Modifier.height(6.dp))
+        Button(enabled = !verification && jeton.isNotBlank(), onClick = {
+            Session.prefs.jetonGithub = jeton
+            verification = true
+            scope.action(snackbar) {
+                try {
+                    val v = fr.cedric.tessvine.data.Maj.verifier(jeton)
+                    if (v == null) snackbar.showSnackbar("L'appli est à jour") else nouvelle = v
+                } finally { verification = false }
+            }
+        }) { Text(if (verification) "Vérification…" else "Vérifier maintenant") }
+    }
+    nouvelle?.let { v -> fr.cedric.tessvine.ui.composants.DialogueMiseAJour(v) { nouvelle = null } }
 }

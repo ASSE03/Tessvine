@@ -31,6 +31,12 @@ class Preferences(context: Context) {
     var cle: String
         get() = p.getString("cle", "") ?: ""
         set(v) = p.edit().putString("cle", v.trim()).apply()
+    var jetonGithub: String
+        get() = p.getString("jeton_github", "") ?: ""
+        set(v) = p.edit().putString("jeton_github", v.trim()).apply()
+    var majAuto: Boolean
+        get() = p.getBoolean("maj_auto", true)
+        set(v) = p.edit().putBoolean("maj_auto", v).apply()
     val configure: Boolean get() = urlMaison.isNotBlank() || urlExterieur.isNotBlank()
     /** Vrai tant que l'écran de connexion n'a jamais été validé. */
     val premierLancement: Boolean get() = !p.contains("url_maison")
