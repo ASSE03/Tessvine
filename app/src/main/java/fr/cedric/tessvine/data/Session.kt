@@ -57,3 +57,21 @@ fun nomPlace(rangee: Int?, colonne: Int?): String {
 fun titreVin(nom: String, millesime: Int?) = if (millesime != null) "$nom $millesime" else nom
 
 fun sousTitre(vararg morceaux: String?) = morceaux.filter { !it.isNullOrBlank() }.joinToString(" · ")
+
+
+/** Contenance d'un format en cl (« 75cl », « 1,5 L », « Magnum »…), ou null si inconnue. */
+fun contenanceCl(format: String): Double? {
+    val t = format.trim().lowercase()
+    if (t.isEmpty()) return null
+    Regex("""(\d+(?:[.,]\d+)?)\s*(ml|cl|l)\b""").find(t)?.let { m ->
+        val n = m.groupValues[1].replace(',', '.').toDouble()
+        return when (m.groupValues[2]) { "ml" -> n / 10; "cl" -> n; else -> n * 100 }
+    }
+    val noms = mapOf("demi" to 37.5, "magnum" to 150.0, "jeroboam" to 300.0, "jéroboam" to 300.0, "cubi" to 300.0,
+        "mathusalem" to 600.0, "salmanazar" to 900.0, "balthazar" to 1200.0, "nabuchodonosor" to 1500.0)
+    noms.forEach { (nom, cl) -> if (nom in t) return cl }
+    return t.replace(',', '.').toDoubleOrNull()
+}
+
+/** Bouteille trop grande pour les casiers de la cave (plus de 75 cl). */
+fun grandFormat(format: String): Boolean = (contenanceCl(format) ?: 0.0) > 75.0

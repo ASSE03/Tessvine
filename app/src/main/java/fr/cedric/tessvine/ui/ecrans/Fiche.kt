@@ -165,8 +165,10 @@ fun EcranFiche(nav: Nav, id: Int) {
                                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            if (b.rangee == null) {
-                                TextButton(onClick = { nav.plan(b.cave_id ?: 0, placer = b.id) }) { Text("Ranger") }
+                            if (b.rangee == null && !fr.cedric.tessvine.data.grandFormat(v.format)) {
+                                TextButton(onClick = { nav.plan(0, vin = v.id, placer = b.id) }) {
+                                    Text(if (b.cave_id == null) "Ranger" else "Mettre en cave")
+                                }
                             }
                             TextButton(onClick = { sortie = b.id }) { Text("Sortir") }
                         }

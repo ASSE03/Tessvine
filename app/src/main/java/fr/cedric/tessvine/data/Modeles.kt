@@ -63,6 +63,7 @@ data class Bouteille(
     val couleur: String = "",
     val domaine: String = "",
     val appellation: String = "",
+    val format: String = "",
     val statut: String = "",
     val a_photo: Boolean = false,
     val updated_at: String = "",

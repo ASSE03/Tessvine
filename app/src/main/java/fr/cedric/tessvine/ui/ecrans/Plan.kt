@@ -69,6 +69,7 @@ import fr.cedric.tessvine.data.Cave
 import fr.cedric.tessvine.data.Profondeur
 import fr.cedric.tessvine.data.Session
 import fr.cedric.tessvine.data.Vin
+import fr.cedric.tessvine.data.grandFormat
 import fr.cedric.tessvine.data.lettreRang
 import fr.cedric.tessvine.data.nomPlace
 import fr.cedric.tessvine.data.obj
@@ -126,12 +127,20 @@ fun EcranPlan(nav: Nav, caveDemandee: Int, vinSurligne: Int, placerDemande: Int)
     var caveId by remember { mutableIntStateOf(caveDemandee) }
     LaunchedEffect(caves.donnees, vinCible.donnees) {
         if (caveId == 0) {
-            caveId = vinCible.donnees?.bouteilles?.firstNotNullOfOrNull { it.cave_racine }
-                ?: caves.donnees?.firstOrNull { it.parent_id == null }?.id ?: 0
+            // une cave avec un plan (pas un rangement libre comme le cellier)
+            val avecPlan = caves.donnees?.filter { it.parent_id == null && it.capacite > 0 } ?: emptyList()
+            caveId = vinCible.donnees?.bouteilles?.mapNotNull { it.cave_racine }?.firstOrNull { r -> avecPlan.any { it.id == r } }
+                ?: avecPlan.firstOrNull()?.id ?: caves.donnees?.firstOrNull { it.parent_id == null }?.id ?: 0
         }
     }
     val cave = charger(caveId) { if (caveId > 0) Session.api.cave(caveId) else null }
     val aRanger = charger("non-rangees") { Session.api.nonRangees() }
+    // bouteilles d'un rangement libre (cave sans plan : cellier…) qu'on peut transférer dans la cave
+    val libres = charger("libres", caves.donnees) {
+        caves.donnees.orEmpty().filter { it.parent_id == null && it.capacite == 0 }.flatMap { c ->
+            Session.api.cave(c.id).bouteilles.filter { !grandFormat(it.format) }.map { it.copy(cave_nom = c.nom) }
+        }
+    }
 
     var profondeur by remember { mutableIntStateOf(0) }
     var recherche by remember { mutableStateOf("") }
@@ -142,8 +151,14 @@ fun EcranPlan(nav: Nav, caveDemandee: Int, vinSurligne: Int, placerDemande: Int)
     var sortir by remember { mutableStateOf<Pair<Vin, Int>?>(null) }
 
     // « Ranger celle-ci » depuis l'accueil ou la fiche : la bouteille à placer est connue
-    LaunchedEffect(placerDemande, aRanger.donnees) {
-        if (placerDemande > 0 && aPlacer == null) aPlacer = aRanger.donnees?.firstOrNull { it.id == placerDemande }
+    LaunchedEffect(placerDemande, aRanger.donnees, libres.donnees, vinCible.donnees) {
+        if (placerDemande > 0 && aPlacer == null) {
+            val v = vinCible.donnees
+            aPlacer = aRanger.donnees?.firstOrNull { it.id == placerDemande }
+                ?: libres.donnees?.firstOrNull { it.id == placerDemande }
+                ?: v?.bouteilles?.firstOrNull { it.id == placerDemande }
+                    ?.copy(nom = v.nom, millesime = v.millesime, couleur = v.couleur, domaine = v.domaine, appellation = v.appellation)
+        }
     }
 
     fun poser(b: Bouteille, casier: Cave, place: Place) = scope.action(snackbar) {
@@ -243,6 +258,28 @@ fun EcranPlan(nav: Nav, caveDemandee: Int, vinSurligne: Int, placerDemande: Int)
                         }
                     }
                 }
+                val dansLibre = libres.donnees ?: emptyList()
+                if (dansLibre.isNotEmpty()) {
+                    Titre("Dans un rangement libre (${dansLibre.size})")
+                    Text("Touchez une bouteille, puis une place libre du plan, pour la transférer dans la cave.",
+                        Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    dansLibre.forEach { b ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { aPlacer = b }.padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Pastille(b.couleur, 16)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(titreVin(b.nom, b.millesime))
+                                Text(sousTitre(b.cave_nom, b.domaine), style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Text(if (aPlacer?.id == b.id) "choisie" else "Transférer ›", color = Or)
+                        }
+                    }
+                }
                 Spacer(Modifier.height(30.dp))
             }
         }
@@ -281,7 +318,7 @@ fun EcranPlan(nav: Nav, caveDemandee: Int, vinSurligne: Int, placerDemande: Int)
             Column(Modifier.padding(bottom = 28.dp)) {
                 Text("Ranger en ${nomPlace(place.rangee, place.colonne)}", style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.padding(horizontal = 20.dp))
-                val liste = aRanger.donnees ?: emptyList()
+                val liste = (aRanger.donnees ?: emptyList()) + (libres.donnees ?: emptyList())
                 if (liste.isEmpty()) Text("Aucune bouteille à ranger. Pour déplacer une bouteille, touchez-la puis « Déplacer ».",
                     Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 liste.forEach { b ->
@@ -289,7 +326,11 @@ fun EcranPlan(nav: Nav, caveDemandee: Int, vinSurligne: Int, placerDemande: Int)
                         Modifier.fillMaxWidth().clickable { placeLibre = null; poser(b, casier, place) }.padding(horizontal = 20.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Pastille(b.couleur, 16); Spacer(Modifier.width(12.dp)); Text(titreVin(b.nom, b.millesime))
+                        Pastille(b.couleur, 16); Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(titreVin(b.nom, b.millesime))
+                            b.cave_nom?.let { Text("depuis $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        }
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
